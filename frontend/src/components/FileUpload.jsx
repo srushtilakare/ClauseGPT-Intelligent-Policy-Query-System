@@ -1,7 +1,6 @@
-// 📁 File: frontend/src/components/FileUpload.jsx
-
 import React, { useState } from "react";
 import axios from "axios";
+import "./FileUpload.css"; // Make sure this file exists for styling
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
@@ -13,42 +12,45 @@ const FileUpload = () => {
   };
 
   const handleUpload = async () => {
-    if (!file) return alert("Please choose a file");
+    if (!file) {
+      alert("Please select a file first.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
-    setLoading(true);
 
     try {
-      const response = await axios.post("/upload", formData);
-      setClauses(response.data);
+      setLoading(true);
+      const response = await axios.post("http://localhost:8000/analyze", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setClauses(response.data.clauses || []);
+      setLoading(false);
     } catch (error) {
-      alert("Upload failed!");
-    } finally {
+      console.error("Upload failed:", error);
+      alert("Error uploading file. Try again.");
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4 text-center">ClauseGPT - Upload Policy Document</h1>
+    <div className="upload-container">
+      <h2>Upload Your Insurance Policy</h2>
+      <input type="file" accept=".pdf" onChange={handleFileChange} />
+      <button onClick={handleUpload}>Upload</button>
 
-      <input type="file" onChange={handleFileChange} accept=".pdf,.docx" className="mb-4" />
-      <button
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        onClick={handleUpload}
-      >
-        {loading ? "Uploading..." : "Upload & Extract Clauses"}
-      </button>
+      {loading && <p>⏳ Processing file, please wait...</p>}
 
       {clauses.length > 0 && (
-        <div className="mt-6">
-          <h2 className="font-semibold text-lg">Extracted Clauses</h2>
-          <ul className="bg-gray-100 p-4 rounded mt-2">
-            {clauses.map((clause) => (
-              <li key={clause.clause_id} className="mb-2">
-                <strong>{clause.clause_id}</strong>: {clause.text}
-              </li>
+        <div className="clauses-container">
+          <h3>Matched Clauses:</h3>
+          <ul>
+            {clauses.map((clause, index) => (
+              <li key={index}>{clause}</li>
             ))}
           </ul>
         </div>
