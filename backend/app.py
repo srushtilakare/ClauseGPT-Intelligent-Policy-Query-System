@@ -1,155 +1,74 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
-from PyPDF2 import PdfReader
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-import tempfile
+from fastapi.responses import JSONResponse
+from typing import List
+import pymupdf  # Correct import for PyMuPDF
+import pymupdf as fitz  # ✅ Alias it to use as `fitz`
 import os
-import re
-import json
-from pydantic import BaseModel
-import google.generativeai as genai
+import shutil
+import uvicorn
 
-# Set your Gemini API Key
-GOOGLE_API_KEY = "AIzaSyCLj1ReK7kW5rpDamsiBA5_VsQHH2_1e_k"
-genai.configure(api_key=GOOGLE_API_KEY)
-gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
-
-# Initialize FastAPI app
 app = FastAPI()
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],  # You can limit this to your frontend domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Sentence transformer and FAISS setup
-model = SentenceTransformer("all-MiniLM-L6-v2")
-dimension = 384
-index = faiss.IndexFlatL2(dimension)
-clause_metadata = []
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Sample clause keywords
+clause_keywords = [
+    "termination", "confidentiality", "governing law", "payment terms", 
+    "liability", "intellectual property", "warranty", "dispute resolution"
+]
 
 @app.get("/")
-def root():
+def read_root():
     return {"message": "FastAPI backend is running!"}
 
-
 @app.post("/analyze")
-async def analyze_pdf(file: UploadFile = File(...)):
-    try:
-        suffix = os.path.splitext(file.filename)[-1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(await file.read())
-            tmp_path = tmp.name
+async def analyze(file: UploadFile = File(...)):
+    file_location = os.path.join(UPLOAD_FOLDER, file.filename)
+    with open(file_location, "wb") as f:
+        shutil.copyfileobj(file.file, f)
 
-        reader = PdfReader(tmp_path)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() or ""
-        os.remove(tmp_path)
+    text = extract_text_from_pdf(file_location)
+    matched_clauses = extract_clauses(text)
 
-        # Rule-based clause matching
-        clause_keywords = {
-            "Termination": ["terminate", "termination", "cancel the agreement"],
-            "Confidentiality": ["confidential", "non-disclosure", "privacy"],
-            "Governing Law": ["jurisdiction", "governing law", "court of"],
-            "Payment Terms": ["invoice", "payment due", "fee structure"],
-            "Liability": ["liability", "indemnify", "responsible for"],
-            "Intellectual Property": ["IP", "intellectual property", "copyright", "patent"]
-        }
-
-        matched_clauses = []
-        for clause, keywords in clause_keywords.items():
-            for keyword in keywords:
-                if keyword.lower() in text.lower():
-                    matched_clauses.append(clause)
-                    break
-
-        # Clause chunking and embedding
-        possible_clauses = re.split(r'\n+|\. ', text)
-        embedded_clauses = [cl.strip() for cl in possible_clauses if len(cl.strip()) > 20]
-        embeddings = model.encode(embedded_clauses)
-        index.add(np.array(embeddings))
-        clause_metadata.extend(embedded_clauses)
-
-        return {
-            "matched_clauses": matched_clauses,
-            "embedded_clause_count": len(embedded_clauses)
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
-
-
-# Search API
-class SearchRequest(BaseModel):
-    query: str
-    top_k: int = 5
-
-
-@app.post("/search")
-async def search_clauses(request: SearchRequest):
-    try:
-        if index.ntotal == 0:
-            return {"error": "No data available for search. Please analyze a PDF first."}
-
-        query_embedding = model.encode([request.query])
-        distances, indices = index.search(np.array(query_embedding), request.top_k)
-
-        results = []
-        for i in indices[0]:
-            if i < len(clause_metadata):
-                results.append(clause_metadata[i])
-
-        return {
-            "query": request.query,
-            "results": results
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
-
-
-# Gemini Query Parser
-class QueryParseRequest(BaseModel):
-    user_input: str
-
+    return JSONResponse(content={"clauses": matched_clauses})
 
 @app.post("/parse_query")
-async def parse_query_with_gemini(request: QueryParseRequest):
+async def parse_query(request: Request):
     try:
-        prompt = f"""
-You are an intelligent assistant that extracts structured health insurance data from user queries.
-Input: "{request.user_input}"
+        body = await request.json()
+        query = body.get("query")
+        if not query:
+            return JSONResponse(content={"response": "No query received"}, status_code=400)
 
-Return a JSON object with:
-- age (integer)
-- gender (Male/Female/Other)
-- treatment (string)
-- duration (string, e.g., "3-month policy")
-
-Example:
-Input: "46M, knee surgery, 3-month policy"
-Output:
-{{
-  "age": 46,
-  "gender": "Male",
-  "treatment": "knee surgery",
-  "duration": "3-month policy"
-}}
-"""
-
-        response = gemini_model.generate_content(prompt)
-        json_string = re.sub(r"```json|```", "", response.text.strip())
-        structured_data = json.loads(json_string)
-
-        return {"structured_info": structured_data}
+        # Simulated Gemini-style response (replace with actual logic)
+        return JSONResponse(content={"response": f"🤖 Gemini says: The answer to your query '{query}' is under construction."})
 
     except Exception as e:
-        return {"error": str(e)}
+        return JSONResponse(content={"response": f"Error: {str(e)}"}, status_code=500)
+
+def extract_text_from_pdf(path):
+    text = ""
+    with fitz.open(path) as doc:
+        for page in doc:
+            text += page.get_text()
+    return text
+
+def extract_clauses(text):
+    matched = []
+    for clause in clause_keywords:
+        if clause.lower() in text.lower():
+            matched.append(clause)
+    return matched
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
