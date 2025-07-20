@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 import os
-import tempfile
+import tempfile 
 import re
 import google.generativeai as genai
 import os
