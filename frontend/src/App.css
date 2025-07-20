@@ -1,1 +1,38 @@
- 
+/* src/App.css */
+
+.app {
+    max-width: 800px;
+    margin: auto;
+    padding: 2rem;
+    font-family: sans-serif;
+    text-align: center;
+  }
+  
+  .upload-container,
+  .query-container {
+    margin-bottom: 1.5rem;
+  }
+  
+  input[type="file"],
+  input[type="text"] {
+    padding: 0.5rem;
+    margin-right: 1rem;
+    font-size: 1rem;
+  }
+  
+  button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  
+  .output-section {
+    text-align: left;
+    margin-top: 2rem;
+  }
+  
+  .output-section ul {
+    list-style: disc;
+    margin-left: 2rem;
+  }
+  

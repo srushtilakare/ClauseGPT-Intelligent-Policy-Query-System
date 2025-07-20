@@ -4,23 +4,22 @@ from PyPDF2 import PdfReader
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
+import tempfile
 import os
-import tempfile 
 import re
-import google.generativeai as genai
-import os
 import json
-# Set your Gemini API Key (you can load from env instead)
+from pydantic import BaseModel
+import google.generativeai as genai
+
+# Set your Gemini API Key
 GOOGLE_API_KEY = "AIzaSyCLj1ReK7kW5rpDamsiBA5_VsQHH2_1e_k"
 genai.configure(api_key=GOOGLE_API_KEY)
-
-# Load Gemini Pro model
 gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
 
-
+# Initialize FastAPI app
 app = FastAPI()
 
-# CORS setup
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -29,35 +28,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Model and FAISS index
-model = SentenceTransformer('all-MiniLM-L6-v2')
-dimension = 384  # embedding size
+# Sentence transformer and FAISS setup
+model = SentenceTransformer("all-MiniLM-L6-v2")
+dimension = 384
 index = faiss.IndexFlatL2(dimension)
-clause_metadata = []  # Store clauses and their info
+clause_metadata = []
 
 
 @app.get("/")
-def read_root():
+def root():
     return {"message": "FastAPI backend is running!"}
 
 
 @app.post("/analyze")
 async def analyze_pdf(file: UploadFile = File(...)):
     try:
-        # Save the uploaded PDF temporarily
         suffix = os.path.splitext(file.filename)[-1]
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(await file.read())
             tmp_path = tmp.name
 
-        # Extract text from PDF
         reader = PdfReader(tmp_path)
         text = ""
         for page in reader.pages:
             text += page.extract_text() or ""
         os.remove(tmp_path)
 
-        # --- Phase 1: Rule-Based Clause Matching ---
+        # Rule-based clause matching
         clause_keywords = {
             "Termination": ["terminate", "termination", "cancel the agreement"],
             "Confidentiality": ["confidential", "non-disclosure", "privacy"],
@@ -74,20 +71,12 @@ async def analyze_pdf(file: UploadFile = File(...)):
                     matched_clauses.append(clause)
                     break
 
-        # --- Phase 2: Semantic Embedding ---
-        # 1. Split text into potential clauses
-        possible_clauses = re.split(r'\n+|\. ', text)  # Split on line breaks or periods
-
-        embedded_clauses = []
-        for clause in possible_clauses:
-            cleaned = clause.strip()
-            if cleaned and len(cleaned) > 20:  # Filter short/noisy lines
-                embedded_clauses.append(cleaned)
-
-        # 2. Embed and add to FAISS
+        # Clause chunking and embedding
+        possible_clauses = re.split(r'\n+|\. ', text)
+        embedded_clauses = [cl.strip() for cl in possible_clauses if len(cl.strip()) > 20]
         embeddings = model.encode(embedded_clauses)
-        index.add(np.array(embeddings))  # Store in FAISS
-        clause_metadata.extend(embedded_clauses)  # Store corresponding text
+        index.add(np.array(embeddings))
+        clause_metadata.extend(embedded_clauses)
 
         return {
             "matched_clauses": matched_clauses,
@@ -96,12 +85,13 @@ async def analyze_pdf(file: UploadFile = File(...)):
 
     except Exception as e:
         return {"error": str(e)}
-from pydantic import BaseModel
 
-# Define input schema for search
+
+# Search API
 class SearchRequest(BaseModel):
     query: str
-    top_k: int = 5  # Default top 5 matches
+    top_k: int = 5
+
 
 @app.post("/search")
 async def search_clauses(request: SearchRequest):
@@ -114,7 +104,7 @@ async def search_clauses(request: SearchRequest):
 
         results = []
         for i in indices[0]:
-            if i < len(clause_metadata):  # Safety check
+            if i < len(clause_metadata):
                 results.append(clause_metadata[i])
 
         return {
@@ -124,9 +114,12 @@ async def search_clauses(request: SearchRequest):
 
     except Exception as e:
         return {"error": str(e)}
-    
+
+
+# Gemini Query Parser
 class QueryParseRequest(BaseModel):
     user_input: str
+
 
 @app.post("/parse_query")
 async def parse_query_with_gemini(request: QueryParseRequest):
@@ -152,14 +145,8 @@ Output:
 }}
 """
 
-        # Generate from Gemini
         response = gemini_model.generate_content(prompt)
-        response_text = response.text.strip()
-
-        # ✅ Sanitize the response (remove ```json ... ```)
-        json_string = re.sub(r"```json|```", "", response_text).strip()
-
-        # ✅ Convert to Python dictionary
+        json_string = re.sub(r"```json|```", "", response.text.strip())
         structured_data = json.loads(json_string)
 
         return {"structured_info": structured_data}

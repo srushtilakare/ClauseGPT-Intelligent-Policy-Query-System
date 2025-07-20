@@ -1,19 +1,22 @@
-import React, { useState } from "react";
-import axios from "axios";
-import "./FileUpload.css"; // Make sure this file exists for styling
+import React, { useState } from 'react';
+import axios from 'axios';
+import './FileUpload.css';
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
-  const [clauses, setClauses] = useState([]);
+  const [clauses, setClauses] = useState([]); // ensure it's an array
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
+    setClauses([]);
+    setError("");
   };
 
   const handleUpload = async () => {
     if (!file) {
-      alert("Please select a file first.");
+      setError("Please select a PDF file.");
       return;
     }
 
@@ -24,29 +27,41 @@ const FileUpload = () => {
       setLoading(true);
       const response = await axios.post("http://localhost:8000/analyze", formData, {
         headers: {
-          "Content-Type": "multipart/form-data",
-        },
+          "Content-Type": "multipart/form-data"
+        }
       });
 
-      setClauses(response.data.clauses || []);
-      setLoading(false);
-    } catch (error) {
-      console.error("Upload failed:", error);
-      alert("Error uploading file. Try again.");
+      if (response.data.matched_clauses) {
+        setClauses(response.data.matched_clauses);
+      } else {
+        setError("No clauses matched or backend returned nothing.");
+        setClauses([]);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      setError("Error uploading or processing file.");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="upload-container">
-      <h2>Upload Your Insurance Policy</h2>
-      <input type="file" accept=".pdf" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload</button>
+      <h1>ClauseGPT - PDF Clause Extractor</h1>
 
-      {loading && <p>⏳ Processing file, please wait...</p>}
+      <input
+        type="file"
+        accept="application/pdf"
+        onChange={handleFileChange}
+      />
+      <button onClick={handleUpload} disabled={loading}>
+        {loading ? "Analyzing..." : "Upload & Analyze"}
+      </button>
+
+      {error && <p className="error-message">{error}</p>}
 
       {clauses.length > 0 && (
-        <div className="clauses-container">
+        <div className="results">
           <h3>Matched Clauses:</h3>
           <ul>
             {clauses.map((clause, index) => (
