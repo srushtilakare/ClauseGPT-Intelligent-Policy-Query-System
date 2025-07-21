@@ -1,77 +1,77 @@
+// src/components/FileUpload.jsx
+
 import React, { useState } from "react";
 import axios from "axios";
-import "./FileUpload.css";
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
   const [clauses, setClauses] = useState([]);
-  const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [text, setText] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setClauses([]);
-    setResponse("");
+    setAnswer("");
   };
 
   const handleUpload = async () => {
-    if (!file) return;
-    setUploading(true);
-    setError("");
+    if (!file) return alert("Please select a file.");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await axios.post("http://localhost:8000/analyze", formData);
-      setClauses(res.data.clauses || []);
+      const res = await axios.post("http://localhost:5000/upload", formData);
+      setClauses(res.data.clauses);
+      setText(res.data.text);
     } catch (err) {
-      setError("Failed to analyze the file.");
-    } finally {
-      setUploading(false);
+      alert("Upload failed");
     }
   };
 
-  const handleQuerySubmit = async () => {
-    if (!query) return;
+  const askGemini = async () => {
     try {
-      const res = await axios.post("http://localhost:8000/parse_query", { query });
-      setResponse(res.data.response);
+      const res = await axios.post("http://localhost:5000/ask", {
+        question,
+        context: text,
+      });
+      setAnswer(res.data.answer);
     } catch (err) {
-      setResponse("Error fetching answer.");
+      setAnswer("❌ Gemini API error. Try again.");
     }
   };
 
   return (
-    <div className="upload-container">
+    <div style={{ padding: 20 }}>
       <h2>ClauseGPT - PDF Clause Extractor</h2>
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload} disabled={uploading}>
-        {uploading ? "Analyzing..." : "Upload & Analyze"}
-      </button>
+      <input type="file" accept="application/pdf" onChange={handleFileChange} />
+      <button onClick={handleUpload}>Upload & Analyze</button>
 
       <h3>📄 Extracted Clauses</h3>
-      {clauses.length > 0 ? (
-        <ul>
-          {clauses.map((clause, idx) => (
-            <li key={idx}>{clause}</li>
-          ))}
-        </ul>
-      ) : (
-        <p>No clauses detected yet.</p>
-      )}
+      <ul>
+        {clauses.map((clause, idx) => (
+          <li key={idx}>{clause}</li>
+        ))}
+      </ul>
 
       <h3>🤖 Gemini Response</h3>
       <input
         type="text"
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
         placeholder="Ask about a clause..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        style={{ width: "70%" }}
       />
-      <button onClick={handleQuerySubmit}>Ask</button>
+      <button onClick={askGemini}>Ask</button>
 
-      <p><strong>Answer:</strong> {response}</p>
-      {error && <p className="error">{error}</p>}
+      {answer && (
+        <div style={{ marginTop: "1rem", whiteSpace: "pre-wrap" }}>
+          <strong>Answer:</strong>
+          <p>{answer}</p>
+        </div>
+      )}
     </div>
   );
 };
