@@ -1,46 +1,61 @@
 .upload-container {
+  margin-top: 30px;
   padding: 20px;
+  background-color: #f3f4f6;
+  border-radius: 10px;
   max-width: 600px;
-  margin: auto;
-  background: #f9f9f9;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
 }
 
-.upload-container h2 {
+.upload-container input[type="file"] {
   margin-bottom: 10px;
 }
 
-input[type="file"], input[type="text"] {
-  display: block;
-  margin-bottom: 10px;
-  width: 100%;
-}
-
-button {
-  padding: 8px 16px;
-  background: #007bff;
+.upload-container button {
+  padding: 10px 20px;
+  margin-top: 10px;
+  background-color: #2d6cdf;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
-  margin-right: 10px;
 }
 
-button:hover {
-  background: #0056b3;
+.upload-container button:disabled {
+  background-color: gray;
+  cursor: not-allowed;
 }
 
-.results {
-  margin-top: 20px;
-}
-
-.results ul {
-  list-style-type: disc;
+.clauses-container ul {
+  list-style: square;
   padding-left: 20px;
 }
 
-.error {
+.question-box input {
+  width: 80%;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.question-box button {
+  margin-top: 10px;
+  margin-left: 5px;
+  padding: 8px 15px;
+}
+
+.response-box {
+  margin-top: 20px;
+  background-color: #e6f7ff;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.error-msg {
   color: red;
+  font-weight: bold;
   margin-top: 10px;
 }
