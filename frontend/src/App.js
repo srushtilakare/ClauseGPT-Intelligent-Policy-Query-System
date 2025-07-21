@@ -1,11 +1,11 @@
-import React from "react";
-import "./App.css";
-import FileUpload from "./components/FileUpload";
+import React from 'react';
+import FileUpload from './components/FileUpload';
+import './App.css';
 
 function App() {
   return (
     <div className="app-container">
-      <h1><center>📄 ClauseGPT - PDF Clause Extractor</center></h1>
+      <h1>ClauseGPT - PDF Clause Extractor</h1>
       <FileUpload />
     </div>
   );

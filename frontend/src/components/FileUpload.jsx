@@ -1,54 +1,44 @@
-import React, { useState } from "react";
-import axios from "axios";
-import "./FileUpload.css";
+import React, { useState } from 'react';
+import axios from 'axios';
+import './FileUpload.css';
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
   const [clauses, setClauses] = useState([]);
-  const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState("");
+  const [question, setQuestion] = useState('');
+  const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setClauses([]);
-    setResponse("");
-    setError("");
+    setResponse('');
   };
 
   const handleUpload = async () => {
-    if (!file) return;
-
-    setLoading(true);
-    setError("");
-    setResponse("");
-
+    if (!file) return alert("Please select a file first.");
     const formData = new FormData();
-    formData.append("file", file);
-
+    formData.append('file', file);
     try {
-      const res = await axios.post("http://localhost:5000/upload", formData);
+      setLoading(true);
+      const res = await axios.post('http://localhost:5000/upload', formData);
       setClauses(res.data.clauses || []);
-    } catch (err) {
-      setError("Failed to extract clauses. Try again.");
+      setResponse('');
+    } catch (error) {
+      alert('File upload failed');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAsk = async () => {
-    if (!question) return;
-    setLoading(true);
-    setError("");
-
+    if (!question) return alert("Please type a question.");
     try {
-      const res = await axios.post("http://localhost:5000/ask", {
-        question: question,
-      });
-      setResponse(res.data.answer || "No response.");
+      setLoading(true);
+      const res = await axios.post('http://localhost:5000/ask', { question });
+      setResponse(res.data.response || 'No response from Gemini');
     } catch (err) {
-      setError("Error getting response.");
+      setResponse('Error: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -56,45 +46,42 @@ const FileUpload = () => {
 
   return (
     <div className="upload-container">
-      <input type="file" accept=".pdf" onChange={handleFileChange} />
+      <h2>Upload a PDF and Extract Clauses</h2>
+      <input type="file" accept="application/pdf" onChange={handleFileChange} />
       <button onClick={handleUpload} disabled={loading}>
-        {loading ? "Analyzing..." : "Upload & Analyze"}
+        {loading ? 'Uploading...' : 'Upload & Analyze'}
       </button>
 
       {clauses.length > 0 && (
-        <div className="clauses-container">
-          <h3>📑 Extracted Clauses</h3>
-          <ul>
-            {clauses.map((clause, index) => (
-              <li key={index}>{clause}</li>
+        <>
+          <h3>📄 Extracted Clauses</h3>
+          <ul className="clauses-list">
+            {clauses.map((clause, i) => (
+              <li key={i}>{clause}</li>
             ))}
           </ul>
-        </div>
+        </>
       )}
 
-      {clauses.length > 0 && (
-        <div className="question-box">
-          <h3>🤖 Ask about a clause</h3>
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="e.g. What are the termination conditions?"
-          />
-          <button onClick={handleAsk} disabled={loading}>
-            Ask
-          </button>
-        </div>
-      )}
+      <div className="ask-section">
+        <h3>🤖 Ask about a clause</h3>
+        <input
+          type="text"
+          value={question}
+          placeholder="e.g., What are the termination conditions?"
+          onChange={(e) => setQuestion(e.target.value)}
+        />
+        <button onClick={handleAsk} disabled={loading}>
+          Ask
+        </button>
 
-      {response && (
-        <div className="response-box">
-          <h3>💡 Answer:</h3>
-          <p>{response}</p>
-        </div>
-      )}
-
-      {error && <p className="error-msg">❌ {error}</p>}
+        {response && (
+          <div className="response-box">
+            <strong>Answer:</strong>
+            <p>{response}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

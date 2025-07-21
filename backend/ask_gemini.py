@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("AIzaSyAhygwZb84uPqdeVvnGqgB9-H0RwN8u-jU"))
 model = genai.GenerativeModel("gemini-pro")
 
 def ask_gemini(clause_text, question):
